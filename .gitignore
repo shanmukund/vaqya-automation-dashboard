@@ -1,0 +1,11 @@
+# Exclude Excel source file (contains client data)
+*.xlsx
+*.xls
+
+# Exclude state snapshots (regenerated from dashboard)
+project_state.json
+
+# Exclude OS files
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vaqya Automation Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; }
+    .status-select { border: none; outline: none; border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; font-weight: 500; width: 100%; transition: background-color 0.2s; }
+    .phase-panel { display: none; }
+    .phase-panel.active { display: block; }
+    .tab-btn { transition: all 0.2s; }
+    .tab-btn.active { border-bottom: 3px solid #0f766e; color: #0f766e; font-weight: 700; }
+    .practice-card { transition: box-shadow 0.2s; }
+    .practice-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .progress-bar-fill { transition: width 0.4s ease; }
+    .completion-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-teal-800 text-white shadow-lg sticky top-0 z-50 no-print">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="bg-teal-600 rounded-lg px-3 py-1 font-black text-xl tracking-tight">V</div>
+      <div>
+        <div class="font-bold text-lg leading-tight">Vaqya Automation Dashboard</div>
+        <div class="text-teal-200 text-xs" id="currentDate"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="text-right hidden sm:block">
+        <div class="text-xs text-teal-300">Last saved</div>
+        <div class="text-xs text-white font-medium" id="lastSaved">—</div>
+      </div>
+      <button onclick="exportState()" class="bg-white text-teal-800 font-semibold text-sm px-4 py-2 rounded-lg hover:bg-teal-50 transition">
+        ⬇ Export State
+      </button>
+      <button onclick="openSetup()" class="bg-teal-600 text-white font-semibold text-sm px-4 py-2 rounded-lg hover:bg-teal-500 transition" title="Configure Google Chat webhook">
+        ⚙️ Setup
+      </button>
+      <button onclick="window.print()" class="bg-teal-700 text-white font-semibold text-sm px-4 py-2 rounded-lg hover:bg-teal-600 transition">
+        🖨 Print
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- SETUP MODAL -->
+<div id="setupModal" class="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center hidden no-print">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+    <div class="bg-teal-800 text-white px-6 py-4 flex items-center justify-between">
+      <div>
+        <div class="font-bold text-base">⚙️ Weekly Report Setup</div>
+        <div class="text-teal-200 text-xs mt-0.5">Configure Google Chat notifications</div>
+      </div>
+      <button onclick="closeSetup()" class="text-teal-200 hover:text-white text-xl leading-none">&times;</button>
+    </div>
+    <div class="px-6 py-5 space-y-5">
+
+      <!-- Step 1 -->
+      <div class="flex gap-3">
+        <div class="bg-teal-100 text-teal-700 font-black text-sm rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5">1</div>
+        <div>
+          <div class="font-semibold text-gray-800 text-sm">Create the webhook in Google Chat</div>
+          <ol class="text-xs text-gray-500 mt-1 space-y-0.5 list-decimal list-inside">
+            <li>Open <b>Google Chat</b> → find <b>"Management Team"</b> space</li>
+            <li>Click the space name at the top → <b>Apps &amp; Integrations</b></li>
+            <li>Click <b>Webhooks</b> → <b>Add Webhook</b></li>
+            <li>Name it <code class="bg-gray-100 px-1 rounded">Vaqya Automation Bot</code> → Save</li>
+            <li>Click <b>Copy</b> next to the generated URL</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="flex gap-3">
+        <div class="bg-teal-100 text-teal-700 font-black text-sm rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5">2</div>
+        <div class="w-full">
+          <div class="font-semibold text-gray-800 text-sm mb-1.5">Paste your webhook URL here</div>
+          <input
+            id="webhookUrlInput"
+            type="url"
+            placeholder="https://chat.googleapis.com/v1/spaces/..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+          />
+          <div id="webhookValidation" class="text-xs mt-1 hidden"></div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="flex gap-3">
+        <div class="bg-teal-100 text-teal-700 font-black text-sm rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5">3</div>
+        <div class="w-full">
+          <div class="font-semibold text-gray-800 text-sm mb-1">Download &amp; replace the task file</div>
+          <p class="text-xs text-gray-500 mb-2">This downloads an updated <code class="bg-gray-100 px-1 rounded">SKILL.md</code> with your webhook URL already filled in. Save it to:</p>
+          <div class="bg-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600 font-mono break-all mb-2">
+            C:\Users\shanm\.claude\scheduled-tasks\vaqya-weekly-progress-report\SKILL.md
+          </div>
+          <div class="flex gap-2">
+            <button onclick="downloadSkillMd()" class="bg-teal-700 hover:bg-teal-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition flex-1">
+              ⬇ Download Updated SKILL.md
+            </button>
+            <button onclick="copyPath()" class="border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium text-xs px-3 py-2 rounded-lg transition" title="Copy folder path">
+              📋 Copy Path
+            </button>
+          </div>
+          <div id="downloadStatus" class="text-xs mt-2 hidden"></div>
+        </div>
+      </div>
+
+      <!-- Status indicator -->
+      <div id="webhookStatusBanner" class="rounded-lg px-4 py-3 text-sm hidden"></div>
+
+    </div>
+    <div class="bg-gray-50 border-t border-gray-200 px-6 py-3 flex justify-between items-center">
+      <span class="text-xs text-gray-400">Gmail draft: drmukundan@vaqya.com · Every Friday 3 PM</span>
+      <button onclick="closeSetup()" class="text-sm text-gray-500 hover:text-gray-700 font-medium">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- OVERALL STATS BAR -->
+<div class="bg-white border-b border-gray-200 no-print">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-4 items-center">
+    <div class="flex items-center gap-2 text-sm">
+      <span class="text-gray-500">Overall Progress:</span>
+      <div class="w-40 bg-gray-200 rounded-full h-3">
+        <div id="overallBar" class="progress-bar-fill bg-teal-600 h-3 rounded-full" style="width:0%"></div>
+      </div>
+      <span id="overallPct" class="font-bold text-teal-700">0%</span>
+    </div>
+    <div class="flex gap-4 text-xs text-gray-600 flex-wrap">
+      <span>📋 <b>16</b> Practices</span>
+      <span>⚙️ <b>96</b> Components</span>
+      <span id="completedCount">✅ <b>0</b> Complete</span>
+      <span id="inProgressCount">🔄 <b>0</b> In Progress</span>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE TABS -->
+<div class="bg-white border-b border-gray-200 sticky top-[57px] z-40 no-print">
+  <div class="max-w-7xl mx-auto px-4 flex gap-0">
+    <button class="tab-btn active px-5 py-3 text-sm text-gray-600 border-b-3" onclick="switchTab('phase1', this)">
+      <span class="font-semibold">Phase 1</span>
+      <span class="ml-1 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Jun 2026</span>
+      <span class="ml-1 text-xs font-bold text-teal-600" id="tab-pct-phase1">0%</span>
+    </button>
+    <button class="tab-btn px-5 py-3 text-sm text-gray-600" onclick="switchTab('phase2', this)">
+      <span class="font-semibold">Phase 2</span>
+      <span class="ml-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Aug 2026</span>
+      <span class="ml-1 text-xs font-bold text-teal-600" id="tab-pct-phase2">0%</span>
+    </button>
+    <button class="tab-btn px-5 py-3 text-sm text-gray-600" onclick="switchTab('phase3', this)">
+      <span class="font-semibold">Phase 3</span>
+      <span class="ml-1 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Oct 2026</span>
+      <span class="ml-1 text-xs font-bold text-teal-600" id="tab-pct-phase3">0%</span>
+    </button>
+    <button class="tab-btn px-5 py-3 text-sm text-gray-600" onclick="switchTab('phase4', this)">
+      <span class="font-semibold">Phase 4</span>
+      <span class="ml-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">TBD</span>
+      <span class="ml-1 text-xs font-bold text-teal-600" id="tab-pct-phase4">0%</span>
+    </button>
+  </div>
+</div>
+
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- WEEKLY FOCUS PANEL -->
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 no-print">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-lg">🎯</span>
+      <h2 class="font-bold text-amber-800 text-sm uppercase tracking-wide">Weekly Focus — Top Priorities</h2>
+      <span class="text-xs text-amber-600 ml-auto">Auto-updates as you track progress</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="weeklyFocusGrid"></div>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div id="phase1" class="phase-panel active">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Phase 1</h2>
+        <p class="text-sm text-gray-500">Target: <span class="font-semibold text-orange-600">June 2026</span> · 6 practices · Arizona</p>
+      </div>
+      <div class="text-right">
+        <div class="text-2xl font-black text-teal-700" id="phase1-pct-label">0%</div>
+        <div class="text-xs text-gray-500">Phase Complete</div>
+      </div>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mb-6">
+      <div id="phase1-bar" class="progress-bar-fill bg-teal-500 h-3 rounded-full" style="width:0%"></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" id="cards-phase1"></div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div id="phase2" class="phase-panel">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Phase 2</h2>
+        <p class="text-sm text-gray-500">Target: <span class="font-semibold text-blue-600">August 2026</span> · 7 practices · FL, GA, TX, IL</p>
+      </div>
+      <div class="text-right">
+        <div class="text-2xl font-black text-teal-700" id="phase2-pct-label">0%</div>
+        <div class="text-xs text-gray-500">Phase Complete</div>
+      </div>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mb-6">
+      <div id="phase2-bar" class="progress-bar-fill bg-teal-500 h-3 rounded-full" style="width:0%"></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" id="cards-phase2"></div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div id="phase3" class="phase-panel">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Phase 3</h2>
+        <p class="text-sm text-gray-500">Target: <span class="font-semibold text-purple-600">October 2026</span> · 1 practice · Missouri</p>
+      </div>
+      <div class="text-right">
+        <div class="text-2xl font-black text-teal-700" id="phase3-pct-label">0%</div>
+        <div class="text-xs text-gray-500">Phase Complete</div>
+      </div>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mb-6">
+      <div id="phase3-bar" class="progress-bar-fill bg-teal-500 h-3 rounded-full" style="width:0%"></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" id="cards-phase3"></div>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div id="phase4" class="phase-panel">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Phase 4</h2>
+        <p class="text-sm text-gray-500">Target: <span class="font-semibold text-gray-500">TBD</span> · 2 practices · KY, AZ</p>
+      </div>
+      <div class="text-right">
+        <div class="text-2xl font-black text-teal-700" id="phase4-pct-label">0%</div>
+        <div class="text-xs text-gray-500">Phase Complete</div>
+      </div>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mb-6">
+      <div id="phase4-bar" class="progress-bar-fill bg-teal-500 h-3 rounded-full" style="width:0%"></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" id="cards-phase4"></div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="bg-white border-t border-gray-200 mt-8 py-4 text-center text-xs text-gray-400">
+  Vaqya Automation Dashboard · Denial Management &amp; Eligibility Verification Project · 2026
+</footer>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────
+const PHASES = [
+  {
+    id: 'phase1',
+    label: 'Phase 1',
+    deadline: 'June 2026',
+    practices: [
+      { id: 'arthritis-consultants-pc',   name: 'Arthritis Consultants PC',    state: 'Arizona',  priority: 1 },
+      { id: 'premier-health-wellness',    name: 'Premier Health and Wellness', state: 'Arizona',  priority: 2 },
+      { id: 'arizona-heart-specialists',  name: 'Arizona Heart Specialists AZ',state: 'Arizona',  priority: 3 },
+      { id: 'greatcare-wellness',         name: 'Greatcare and Wellness',      state: 'Arizona',  priority: 4 },
+      { id: 'harshdeep-babbar',           name: 'Harshdeep Babbar',            state: 'Arizona',  priority: 5 },
+      { id: 'jatinder-purewal',           name: 'Jatinder Purewal',            state: 'Arizona',  priority: 6 },
+    ]
+  },
+  {
+    id: 'phase2',
+    label: 'Phase 2',
+    deadline: 'August 2026',
+    practices: [
+      { id: 'markus-klaus',              name: 'Markus Klaus',              state: 'Florida',   priority: 1 },
+      { id: 'swati-shah',               name: 'Swati Shah',                state: 'Florida',   priority: 2 },
+      { id: 'eastside-rheumatology',    name: 'Eastside Rheumatology',     state: 'Georgia',   priority: 3 },
+      { id: 'brookshire-rheumatology',  name: 'Brookshire Rheumatology',   state: 'Florida',   priority: 4 },
+      { id: 'healing-rheumatology',     name: 'Healing Rheumatology',      state: 'Florida',   priority: 5 },
+      { id: 'first-choice-rheumatology',name: 'First Choice Rheumatology', state: 'Texas',     priority: 6 },
+      { id: 'ravenswood-rheumatology',  name: 'Ravenswood Rheumatology',   state: 'Illinois',  priority: 7 },
+    ]
+  },
+  {
+    id: 'phase3',
+    label: 'Phase 3',
+    deadline: 'October 2026',
+    practices: [
+      { id: 'west-county-rheumatology', name: 'West County Rheumatology',  state: 'Missouri',  priority: 1 },
+    ]
+  },
+  {
+    id: 'phase4',
+    label: 'Phase 4',
+    deadline: 'TBD',
+    practices: [
+      { id: 'miispine',        name: 'Miispine',        state: 'Kentucky', priority: 1 },
+      { id: 'sunrise-medical', name: 'Sunrise Medical', state: 'Arizona',  priority: 2 },
+    ]
+  }
+];
+
+const COMPONENTS = [
+  { id: 'claim-scrubbing',          label: 'Claim Scrubbing' },
+  { id: 'eligibility-verification', label: 'Eligibility Verification' },
+  { id: 'denial-management',        label: 'Denial Management' },
+  { id: 'prior-authorization',      label: 'Prior Authorization' },
+  { id: 'claims-submission',        label: 'Claims Submission' },
+  { id: 'posting',                  label: 'Posting' },
+];
+
+const STATUSES = ['Not Started', 'In Progress', 'Testing', 'Complete'];
+
+const STATUS_COLORS = {
+  'Not Started': { bg: '#f3f4f6', text: '#4b5563' },
+  'In Progress': { bg: '#dbeafe', text: '#1d4ed8' },
+  'Testing':     { bg: '#fef9c3', text: '#a16207' },
+  'Complete':    { bg: '#dcfce7', text: '#15803d' },
+};
+
+const STATE_KEY = 'vaqya_project_state';
+let STATE = {};
+
+// ─────────────────────────────────────────────
+// STATE MANAGEMENT
+// ─────────────────────────────────────────────
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STATE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return null;
+}
+
+function saveState() {
+  STATE.lastSaved = new Date().toISOString();
+  localStorage.setItem(STATE_KEY, JSON.stringify(STATE));
+  const ts = new Date(STATE.lastSaved);
+  document.getElementById('lastSaved').textContent =
+    ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+    ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function initState() {
+  const saved = loadState();
+  STATE = saved || { lastSaved: null, practices: {} };
+  if (!STATE.practices) STATE.practices = {};
+
+  // Ensure every practice/component key exists
+  PHASES.forEach(phase => {
+    phase.practices.forEach(p => {
+      if (!STATE.practices[p.id]) STATE.practices[p.id] = {};
+      COMPONENTS.forEach(c => {
+        if (!STATE.practices[p.id][c.id]) {
+          STATE.practices[p.id][c.id] = 'Not Started';
+        }
+      });
+    });
+  });
+
+  if (STATE.lastSaved) {
+    const ts = new Date(STATE.lastSaved);
+    document.getElementById('lastSaved').textContent =
+      ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+      ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+}
+
+// ─────────────────────────────────────────────
+// CALCULATIONS
+// ─────────────────────────────────────────────
+function calcPracticeCompletion(practiceId) {
+  const pState = STATE.practices[practiceId] || {};
+  const done = COMPONENTS.filter(c => pState[c.id] === 'Complete').length;
+  return Math.round((done / COMPONENTS.length) * 100);
+}
+
+function calcPhaseCompletion(phaseId) {
+  const phase = PHASES.find(p => p.id === phaseId);
+  if (!phase || !phase.practices.length) return 0;
+  const total = phase.practices.reduce((sum, p) => sum + calcPracticeCompletion(p.id), 0);
+  return Math.round(total / phase.practices.length);
+}
+
+function calcOverall() {
+  let done = 0, inProg = 0;
+  PHASES.forEach(phase => {
+    phase.practices.forEach(p => {
+      COMPONENTS.forEach(c => {
+        const status = STATE.practices[p.id]?.[c.id] || 'Not Started';
+        if (status === 'Complete') done++;
+        if (status === 'In Progress' || status === 'Testing') inProg++;
+      });
+    });
+  });
+  return { done, inProg, total: 96 };
+}
+
+// ─────────────────────────────────────────────
+// DOM UPDATES
+// ─────────────────────────────────────────────
+function updateState(selectEl) {
+  const practiceId = selectEl.dataset.practice;
+  const componentId = selectEl.dataset.component;
+  STATE.practices[practiceId][componentId] = selectEl.value;
+  applyStatusColor(selectEl);
+  saveState();
+  refreshPracticeCard(practiceId);
+  const phaseId = getPracticePhase(practiceId);
+  refreshPhaseProgress(phaseId);
+  refreshOverall();
+  renderWeeklyFocus();
+}
+
+function applyStatusColor(sel) {
+  const colors = STATUS_COLORS[sel.value] || STATUS_COLORS['Not Started'];
+  sel.style.backgroundColor = colors.bg;
+  sel.style.color = colors.text;
+}
+
+function getPracticePhase(practiceId) {
+  for (const phase of PHASES) {
+    if (phase.practices.find(p => p.id === practiceId)) return phase.id;
+  }
+  return null;
+}
+
+function refreshPracticeCard(practiceId) {
+  const pct = calcPracticeCompletion(practiceId);
+  const badge = document.getElementById('badge-' + practiceId);
+  if (!badge) return;
+  badge.textContent = pct + '%';
+  badge.className = 'completion-badge ' + (
+    pct === 100 ? 'bg-green-100 text-green-700' :
+    pct > 0     ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-500'
+  );
+}
+
+function refreshPhaseProgress(phaseId) {
+  const pct = calcPhaseCompletion(phaseId);
+  const bar = document.getElementById(phaseId + '-bar');
+  const label = document.getElementById(phaseId + '-pct-label');
+  const tabPct = document.getElementById('tab-pct-' + phaseId);
+  if (bar) bar.style.width = pct + '%';
+  if (label) label.textContent = pct + '%';
+  if (tabPct) tabPct.textContent = pct + '%';
+}
+
+function refreshOverall() {
+  const { done, inProg, total } = calcOverall();
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('overallBar').style.width = pct + '%';
+  document.getElementById('overallPct').textContent = pct + '%';
+  document.getElementById('completedCount').innerHTML = `✅ <b>${done}</b> Complete`;
+  document.getElementById('inProgressCount').innerHTML = `🔄 <b>${inProg}</b> In Progress`;
+}
+
+// ─────────────────────────────────────────────
+// WEEKLY FOCUS PANEL
+// ─────────────────────────────────────────────
+function renderWeeklyFocus() {
+  const grid = document.getElementById('weeklyFocusGrid');
+  grid.innerHTML = '';
+
+  PHASES.forEach(phase => {
+    const phaseColors = {
+      phase1: { border: 'border-orange-300', header: 'text-orange-700 bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
+      phase2: { border: 'border-blue-300',   header: 'text-blue-700 bg-blue-50',   badge: 'bg-blue-100 text-blue-700' },
+      phase3: { border: 'border-purple-300', header: 'text-purple-700 bg-purple-50', badge: 'bg-purple-100 text-purple-700' },
+      phase4: { border: 'border-gray-300',   header: 'text-gray-600 bg-gray-50',   badge: 'bg-gray-100 text-gray-600' },
+    };
+    const c = phaseColors[phase.id];
+
+    // Sort by priority, then filter incomplete (0–99%)
+    const sorted = [...phase.practices].sort((a, b) => a.priority - b.priority);
+    const incomplete = sorted.filter(p => calcPracticeCompletion(p.id) < 100);
+    const top = incomplete.slice(0, 3);
+
+    const col = document.createElement('div');
+    col.className = `border ${c.border} rounded-lg overflow-hidden`;
+    col.innerHTML = `
+      <div class="px-3 py-2 ${c.header} font-bold text-xs uppercase tracking-wide flex justify-between items-center">
+        <span>${phase.label} · ${phase.deadline}</span>
+        <span class="${c.badge} text-xs px-2 py-0.5 rounded-full">${calcPhaseCompletion(phase.id)}%</span>
+      </div>
+      <div class="bg-white divide-y divide-gray-100">
+        ${top.length === 0
+          ? `<div class="px-3 py-3 text-xs text-green-600 font-semibold">✅ All complete!</div>`
+          : top.map(p => {
+              const pct = calcPracticeCompletion(p.id);
+              const nextComp = COMPONENTS.find(c => STATE.practices[p.id]?.[c.id] !== 'Complete');
+              return `
+              <div class="px-3 py-2">
+                <div class="flex justify-between items-start">
+                  <div class="font-semibold text-xs text-gray-800 leading-tight">${p.name}</div>
+                  <span class="text-xs ${pct > 0 ? 'text-blue-600' : 'text-gray-400'} font-bold ml-2 shrink-0">${pct}%</span>
+                </div>
+                ${nextComp ? `<div class="text-xs text-gray-400 mt-0.5">Next: ${nextComp.label}</div>` : ''}
+              </div>`;
+            }).join('')
+        }
+      </div>
+    `;
+    grid.appendChild(col);
+  });
+}
+
+// ─────────────────────────────────────────────
+// CARD RENDERING
+// ─────────────────────────────────────────────
+function renderCard(practice, phaseId) {
+  const pct = calcPracticeCompletion(practice.id);
+
+  const stateColors = {
+    'Arizona': 'bg-red-50 text-red-700',
+    'Florida':  'bg-sky-50 text-sky-700',
+    'Georgia':  'bg-emerald-50 text-emerald-700',
+    'Texas':    'bg-orange-50 text-orange-700',
+    'Illinois': 'bg-indigo-50 text-indigo-700',
+    'Missouri': 'bg-violet-50 text-violet-700',
+    'Kentucky': 'bg-pink-50 text-pink-700',
+  };
+  const stateClass = stateColors[practice.state] || 'bg-gray-100 text-gray-600';
+
+  const priorityClass = practice.priority === 1 ? 'bg-red-500 text-white' :
+                        practice.priority === 2 ? 'bg-orange-400 text-white' :
+                        practice.priority === 3 ? 'bg-yellow-400 text-gray-800' :
+                        'bg-gray-200 text-gray-600';
+
+  const rows = COMPONENTS.map(comp => {
+    const status = STATE.practices[practice.id]?.[comp.id] || 'Not Started';
+    const colors = STATUS_COLORS[status];
+    const options = STATUSES.map(s =>
+      `<option value="${s}" ${s === status ? 'selected' : ''}>${s}</option>`
+    ).join('');
+    return `
+      <tr class="border-t border-gray-100">
+        <td class="py-1.5 pr-3 text-xs text-gray-600 font-medium whitespace-nowrap w-44">${comp.label}</td>
+        <td class="py-1.5 w-full">
+          <select
+            class="status-select"
+            style="background-color:${colors.bg}; color:${colors.text};"
+            data-practice="${practice.id}"
+            data-component="${comp.id}"
+            onchange="updateState(this)"
+          >${options}</select>
+        </td>
+      </tr>`;
+  }).join('');
+
+  const completionClass = pct === 100 ? 'bg-green-100 text-green-700' :
+                          pct > 0     ? 'bg-blue-100 text-blue-700' :
+                                        'bg-gray-100 text-gray-500';
+
+  return `
+    <div class="practice-card bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-start justify-between gap-2">
+        <div>
+          <div class="font-bold text-gray-900 text-sm leading-tight">${practice.name}</div>
+          <div class="flex gap-2 mt-1.5 flex-wrap">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium ${stateClass}">${practice.state}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-bold ${priorityClass}">P${practice.priority}</span>
+          </div>
+        </div>
+        <span id="badge-${practice.id}" class="completion-badge ${completionClass} shrink-0">${pct}%</span>
+      </div>
+      <div class="px-4 py-3">
+        <table class="w-full">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────
+// PHASE RENDERING
+// ─────────────────────────────────────────────
+function renderAllCards() {
+  PHASES.forEach(phase => {
+    const container = document.getElementById('cards-' + phase.id);
+    if (!container) return;
+    container.innerHTML = phase.practices.map(p => renderCard(p, phase.id)).join('');
+  });
+}
+
+function refreshAllPhases() {
+  PHASES.forEach(phase => refreshPhaseProgress(phase.id));
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHING
+// ─────────────────────────────────────────────
+function switchTab(phaseId, btn) {
+  document.querySelectorAll('.phase-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(phaseId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// EXPORT STATE
+// ─────────────────────────────────────────────
+function exportState() {
+  const snapshot = JSON.parse(JSON.stringify(STATE));
+  snapshot.exportedAt = new Date().toISOString();
+  snapshot.meta = {
+    totalPractices: 16,
+    totalComponents: 96,
+    phases: PHASES.map(phase => ({
+      id: phase.id,
+      label: phase.label,
+      deadline: phase.deadline,
+      completionPct: calcPhaseCompletion(phase.id),
+      practices: phase.practices.map(p => ({
+        id: p.id,
+        name: p.name,
+        state: p.state,
+        priority: p.priority,
+        completionPct: calcPracticeCompletion(p.id),
+        components: COMPONENTS.reduce((acc, c) => {
+          acc[c.id] = STATE.practices[p.id]?.[c.id] || 'Not Started';
+          return acc;
+        }, {})
+      }))
+    }))
+  };
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'project_state.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
+// SETUP MODAL
+// ─────────────────────────────────────────────
+const SKILL_MD_TEMPLATE = `---
+description: Weekly Vaqya automation progress report — Gmail draft + Google Chat post every Friday 3 PM
+schedule: "0 15 * * 5"
+---
+
+You are generating the weekly Vaqya Automation progress report. Run this every Friday at 3 PM.
+
+## Step 1 — Read Current Project State
+
+Read the file at:
+  C:\\Users\\shanm\\OneDrive\\Desktop\\Vaqya\\vaqya automation\\project_state.json
+
+Parse the JSON. If the file does not exist, note it and proceed with all components as "Not Started".
+
+The 6 automation components tracked per practice are:
+- claim-scrubbing (Claim Scrubbing)
+- eligibility-verification (Eligibility Verification)
+- denial-management (Denial Management)
+- prior-authorization (Prior Authorization)
+- claims-submission (Claims Submission)
+- posting (Posting)
+
+The 16 practices organized by phase:
+
+PHASE 1 (Target: June 2026) — sorted by priority:
+1. Arthritis Consultants PC (Arizona)
+2. Premier Health and Wellness (Arizona)
+3. Arizona Heart Specialists AZ (Arizona)
+4. Greatcare and Wellness (Arizona)
+5. Harshdeep Babbar (Arizona)
+6. Jatinder Purewal (Arizona)
+
+PHASE 2 (Target: August 2026) — sorted by priority:
+1. Markus Klaus (Florida)
+2. Swati Shah (Florida)
+3. Eastside Rheumatology (Georgia)
+4. Brookshire Rheumatology (Florida)
+5. Healing Rheumatology (Florida)
+6. First Choice Rheumatology (Texas)
+7. Ravenswood Rheumatology (Illinois)
+
+PHASE 3 (Target: October 2026):
+1. West County Rheumatology (Missouri)
+
+PHASE 4 (Target: TBD):
+1. Miispine (Kentucky)
+2. Sunrise Medical (Arizona)
+
+## Step 2 — Calculate Progress
+
+For each practice, count how many of the 6 components are "Complete". Practice completion % = (complete count / 6) x 100.
+Phase completion % = average of all practice % in that phase.
+Overall completion % = total Complete components / 96 x 100.
+
+## Step 3 — Generate the Weekly Report
+
+Format the report as plain text:
+
+---
+VAQYA AUTOMATION — WEEKLY PROGRESS REPORT
+Week of: [current date]
+Generated: [current datetime]
+---
+
+OVERALL SUMMARY
+Total Practices: 16 | Total Components: 96
+Overall Completion: X% ([N] of 96 components Complete)
+In Progress / Testing: [count]
+Not Started: [count]
+
+---
+PHASE 1 — June 2026 Target — X% complete
+[For each practice in priority order:]
+  [Priority#] [Practice Name] ([State]) — X%
+    Complete: [list components or "none"]
+    In Progress/Testing: [list or "none"]
+    Not Started: [list or "none"]
+
+---
+PHASE 2 — August 2026 Target — X% complete
+[same format]
+
+---
+PHASE 3 — October 2026 Target — X% complete
+[same format]
+
+---
+PHASE 4 — TBD — X% complete
+[same format]
+
+---
+WEEKLY FOCUS — TOP PRIORITIES
+Phase 1: [top 2 in-progress or not-started practices by priority]
+Phase 2: [top 2 in-progress or not-started practices by priority]
+
+---
+BLOCKERS / NOTES
+[Leave blank — to be filled before sending]
+
+---
+Dashboard: C:\\Users\\shanm\\OneDrive\\Desktop\\Vaqya\\vaqya automation\\index.html
+
+## Step 4 — Create Gmail Draft
+
+Use the gmail_create_draft tool to create a draft with:
+- To: drmukundan@vaqya.com
+- Subject: Vaqya Automation Weekly Report — Week of [DATE]
+- Body: the full formatted report from Step 3
+
+## Step 5 — Post to Google Chat "Management Team"
+
+WEBHOOK_URL="{{WEBHOOK_URL}}"
+
+Run this bash command:
+curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -d "{\\"text\\": \\"*Vaqya Automation — Weekly Update*\\\\nWeek of: [DATE]\\\\n\\\\nOverall: X% ([N]/96)\\\\nPhase 1 (Jun 2026): X%\\\\nPhase 2 (Aug 2026): X%\\\\nPhase 3 (Oct 2026): X%\\\\nPhase 4 (TBD): X%\\\\n\\\\nThis week focus:\\\\n- [top priority 1]\\\\n- [top priority 2]\\\\n\\\\nFull report drafted in Gmail.\\"}"
+
+## Step 6 — Confirm
+
+Output: "Weekly report complete — [date]. Gmail draft created. Google Chat posted."
+`;
+
+function openSetup() {
+  const modal = document.getElementById('setupModal');
+  modal.classList.remove('hidden');
+  // Pre-fill if webhook already saved
+  const saved = localStorage.getItem('vaqya_webhook_url');
+  if (saved) {
+    document.getElementById('webhookUrlInput').value = saved;
+    showWebhookStatus(true, saved);
+  }
+}
+
+function closeSetup() {
+  document.getElementById('setupModal').classList.add('hidden');
+}
+
+function showWebhookStatus(isSet, url) {
+  const banner = document.getElementById('webhookStatusBanner');
+  banner.classList.remove('hidden');
+  if (isSet) {
+    banner.className = 'rounded-lg px-4 py-3 text-sm bg-green-50 text-green-700 border border-green-200';
+    banner.innerHTML = '✅ Webhook configured — Google Chat posts are active every Friday 3 PM';
+  } else {
+    banner.className = 'rounded-lg px-4 py-3 text-sm bg-amber-50 text-amber-700 border border-amber-200';
+    banner.innerHTML = '⚠️ Webhook not yet configured — enter URL above and download the updated file';
+  }
+}
+
+function downloadSkillMd() {
+  const url = document.getElementById('webhookUrlInput').value.trim();
+  const status = document.getElementById('downloadStatus');
+  const validation = document.getElementById('webhookValidation');
+
+  if (!url) {
+    validation.textContent = '⚠️ Please paste your webhook URL first.';
+    validation.className = 'text-xs mt-1 text-amber-600';
+    validation.classList.remove('hidden');
+    return;
+  }
+  if (!url.startsWith('https://chat.googleapis.com')) {
+    validation.textContent = '⚠️ This doesn\'t look like a Google Chat webhook URL. Check and try again.';
+    validation.className = 'text-xs mt-1 text-red-600';
+    validation.classList.remove('hidden');
+    return;
+  }
+
+  validation.classList.add('hidden');
+  localStorage.setItem('vaqya_webhook_url', url);
+
+  const content = SKILL_MD_TEMPLATE.replace('{{WEBHOOK_URL}}', url);
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'SKILL.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  status.textContent = '✅ Downloaded! Save this file to: C:\\Users\\shanm\\.claude\\scheduled-tasks\\vaqya-weekly-progress-report\\  (replace the existing SKILL.md)';
+  status.className = 'text-xs mt-2 text-green-600 font-medium';
+  status.classList.remove('hidden');
+  showWebhookStatus(true, url);
+}
+
+function copyPath() {
+  const path = 'C:\\Users\\shanm\\.claude\\scheduled-tasks\\vaqya-weekly-progress-report\\';
+  navigator.clipboard.writeText(path).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+// Close modal on backdrop click
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('setupModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('setupModal')) closeSetup();
+  });
+});
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('currentDate').textContent =
+    new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  initState();
+  renderAllCards();
+  refreshAllPhases();
+  refreshOverall();
+  renderWeeklyFocus();
+});
+</script>
+</body>
+</html>
