@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vaqya Automation Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     body { font-family: 'Inter', 'Segoe UI', sans-serif; }
     .status-select { border: none; outline: none; border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; font-weight: 500; width: 100%; transition: background-color 0.2s; }
@@ -23,6 +24,41 @@
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" class="fixed inset-0 bg-teal-900 z-[200] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+    <div class="bg-teal-800 px-6 py-6 text-center">
+      <div class="bg-teal-600 rounded-xl px-4 py-2 font-black text-3xl tracking-tight text-white inline-block mb-3">V</div>
+      <h1 class="text-white font-bold text-lg leading-tight">Vaqya Automation Dashboard</h1>
+      <p class="text-teal-300 text-xs mt-1">RCM Project Tracking</p>
+    </div>
+    <div class="px-6 py-6 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Email</label>
+        <input id="loginEmail" type="email" placeholder="team@vaqya.com" autocomplete="email"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-400 focus:border-transparent transition" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Password</label>
+        <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-400 focus:border-transparent transition"
+          onkeydown="if(event.key==='Enter') handleLogin()" />
+      </div>
+      <div id="loginError" class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 hidden"></div>
+      <button id="loginBtn" onclick="handleLogin()"
+        class="w-full bg-teal-700 hover:bg-teal-600 text-white font-bold py-2.5 rounded-lg text-sm transition">
+        Sign In
+      </button>
+    </div>
+    <div class="border-t border-gray-100 px-6 py-3 text-center">
+      <p class="text-xs text-gray-400">Shared team access &middot; Contact <span class="font-medium text-gray-500">drmukundan@vaqya.com</span> for credentials</p>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD (hidden until logged in) -->
+<div id="dashboardWrapper" class="hidden">
 
 <!-- HEADER -->
 <header class="bg-teal-800 text-white shadow-lg sticky top-0 z-50 no-print">
@@ -48,6 +84,9 @@
       <button onclick="window.print()" class="bg-teal-700 text-white font-semibold text-sm px-4 py-2 rounded-lg hover:bg-teal-600 transition">
         🖨 Print
       </button>
+      <button onclick="handleLogout()" class="bg-teal-900 text-teal-300 hover:text-white font-semibold text-sm px-3 py-2 rounded-lg hover:bg-teal-700 transition" title="Sign out">
+        Sign out
+      </button>
     </div>
   </div>
 </header>
@@ -63,8 +102,6 @@
       <button onclick="closeSetup()" class="text-teal-200 hover:text-white text-xl leading-none">&times;</button>
     </div>
     <div class="px-6 py-5 space-y-5">
-
-      <!-- Step 1 -->
       <div class="flex gap-3">
         <div class="bg-teal-100 text-teal-700 font-black text-sm rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5">1</div>
         <div>
@@ -78,23 +115,15 @@
           </ol>
         </div>
       </div>
-
-      <!-- Step 2 -->
       <div class="flex gap-3">
         <div class="bg-teal-100 text-teal-700 font-black text-sm rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5">2</div>
         <div class="w-full">
           <div class="font-semibold text-gray-800 text-sm mb-1.5">Paste your webhook URL here</div>
-          <input
-            id="webhookUrlInput"
-            type="url"
-            placeholder="https://chat.googleapis.com/v1/spaces/..."
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-          />
+          <input id="webhookUrlInput" type="url" placeholder="https://chat.googleapis.com/v1/spaces/..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
           <div id="webhookValidation" class="text-xs mt-1 hidden"></div>
         </div>
       </div>
-
-      <!-- Step 3 -->
       <div class="flex gap-3">
         <div class="bg-teal-100 text-teal-700 font-black text-sm rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5">3</div>
         <div class="w-full">
@@ -114,10 +143,7 @@
           <div id="downloadStatus" class="text-xs mt-2 hidden"></div>
         </div>
       </div>
-
-      <!-- Status indicator -->
       <div id="webhookStatusBanner" class="rounded-lg px-4 py-3 text-sm hidden"></div>
-
     </div>
     <div class="bg-gray-50 border-t border-gray-200 px-6 py-3 flex justify-between items-center">
       <span class="text-xs text-gray-400">Gmail draft: drmukundan@vaqya.com · Every Friday 3 PM</span>
@@ -141,6 +167,10 @@
       <span>⚙️ <b>96</b> Components</span>
       <span id="completedCount">✅ <b>0</b> Complete</span>
       <span id="inProgressCount">🔄 <b>0</b> In Progress</span>
+    </div>
+    <div class="ml-auto flex items-center gap-1.5 text-xs text-teal-600 font-medium">
+      <span class="inline-block w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+      Live sync
     </div>
   </div>
 </div>
@@ -185,7 +215,6 @@
 
   <!-- PORTAL ACCESS SECTION -->
   <div class="bg-white border border-indigo-200 rounded-xl mb-6 overflow-hidden shadow-sm">
-    <!-- Collapsible header -->
     <div class="portal-section-toggle bg-indigo-50 border-b border-indigo-200 px-4 py-3 flex items-center justify-between"
          onclick="togglePortalSection()">
       <div class="flex items-center gap-2">
@@ -203,8 +232,6 @@
         <span id="portal-chevron" class="text-indigo-400 font-bold text-lg transition-transform">▼</span>
       </div>
     </div>
-
-    <!-- Portal table body (collapsible) -->
     <div id="portalTableWrapper" class="overflow-x-auto">
       <table class="portal-table w-full text-xs border-collapse">
         <thead>
@@ -223,8 +250,6 @@
         <tbody id="portalTableBody"></tbody>
       </table>
     </div>
-
-    <!-- Legend -->
     <div class="border-t border-gray-100 px-4 py-2 flex flex-wrap gap-4 text-xs text-gray-500 bg-gray-50">
       <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#f3f4f6"></span> Not Started</span>
       <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#dbeafe"></span> In Progress</span>
@@ -309,18 +334,27 @@
 
 <!-- FOOTER -->
 <footer class="bg-white border-t border-gray-200 mt-8 py-4 text-center text-xs text-gray-400">
-  Vaqya Automation Dashboard · Denial Management &amp; Eligibility Verification Project · 2026
+  Vaqya Automation Dashboard · RCM Automation Project · 2026
 </footer>
 
+</div><!-- /dashboardWrapper -->
+
 <script>
+// ─────────────────────────────────────────────
+// SUPABASE CONFIG
+// Fill in SUPABASE_ANON_KEY from: Supabase → Settings → API → anon/public key
+// ─────────────────────────────────────────────
+const SUPABASE_URL      = 'https://jznezqmqnyahemnwxgki.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6bmV6cW1xbnlhaGVtbnd4Z2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5ODU1MzIsImV4cCI6MjA5MDU2MTUzMn0.Wtgb6-_LF5atqNvHmpfTFQO4OGD0GrH4yPMKUxT9JaY';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 // ─────────────────────────────────────────────
 // DATA
 // ─────────────────────────────────────────────
 const PHASES = [
   {
-    id: 'phase1',
-    label: 'Phase 1',
-    deadline: 'June 2026',
+    id: 'phase1', label: 'Phase 1', deadline: 'June 2026',
     practices: [
       { id: 'arthritis-consultants-pc',   name: 'Arthritis Consultants PC',    state: 'Arizona',  priority: 1 },
       { id: 'premier-health-wellness',    name: 'Premier Health and Wellness', state: 'Arizona',  priority: 2 },
@@ -331,31 +365,25 @@ const PHASES = [
     ]
   },
   {
-    id: 'phase2',
-    label: 'Phase 2',
-    deadline: 'August 2026',
+    id: 'phase2', label: 'Phase 2', deadline: 'August 2026',
     practices: [
-      { id: 'markus-klaus',              name: 'Markus Klaus',              state: 'Florida',   priority: 1 },
-      { id: 'swati-shah',               name: 'Swati Shah',                state: 'Florida',   priority: 2 },
-      { id: 'eastside-rheumatology',    name: 'Eastside Rheumatology',     state: 'Georgia',   priority: 3 },
-      { id: 'brookshire-rheumatology',  name: 'Brookshire Rheumatology',   state: 'Florida',   priority: 4 },
-      { id: 'healing-rheumatology',     name: 'Healing Rheumatology',      state: 'Florida',   priority: 5 },
-      { id: 'first-choice-rheumatology',name: 'First Choice Rheumatology', state: 'Texas',     priority: 6 },
-      { id: 'ravenswood-rheumatology',  name: 'Ravenswood Rheumatology',   state: 'Illinois',  priority: 7 },
+      { id: 'markus-klaus',               name: 'Markus Klaus',              state: 'Florida',  priority: 1 },
+      { id: 'swati-shah',                 name: 'Swati Shah',                state: 'Florida',  priority: 2 },
+      { id: 'eastside-rheumatology',      name: 'Eastside Rheumatology',     state: 'Georgia',  priority: 3 },
+      { id: 'brookshire-rheumatology',    name: 'Brookshire Rheumatology',   state: 'Florida',  priority: 4 },
+      { id: 'healing-rheumatology',       name: 'Healing Rheumatology',      state: 'Florida',  priority: 5 },
+      { id: 'first-choice-rheumatology',  name: 'First Choice Rheumatology', state: 'Texas',    priority: 6 },
+      { id: 'ravenswood-rheumatology',    name: 'Ravenswood Rheumatology',   state: 'Illinois', priority: 7 },
     ]
   },
   {
-    id: 'phase3',
-    label: 'Phase 3',
-    deadline: 'October 2026',
+    id: 'phase3', label: 'Phase 3', deadline: 'October 2026',
     practices: [
-      { id: 'west-county-rheumatology', name: 'West County Rheumatology',  state: 'Missouri',  priority: 1 },
+      { id: 'west-county-rheumatology', name: 'West County Rheumatology', state: 'Missouri', priority: 1 },
     ]
   },
   {
-    id: 'phase4',
-    label: 'Phase 4',
-    deadline: 'TBD',
+    id: 'phase4', label: 'Phase 4', deadline: 'TBD',
     practices: [
       { id: 'miispine',        name: 'Miispine',        state: 'Kentucky', priority: 1 },
       { id: 'sunrise-medical', name: 'Sunrise Medical', state: 'Arizona',  priority: 2 },
@@ -382,13 +410,13 @@ const STATUS_COLORS = {
 };
 
 const PORTALS = [
-  { id: 'uhc',       label: 'UHC' },
-  { id: 'umr',       label: 'UMR' },
-  { id: 'cigna',     label: 'CIGNA' },
-  { id: 'availity',  label: 'AVAILITY' },
-  { id: 'medicare',  label: 'MEDICARE' },
-  { id: 'medicaid',  label: 'MEDICAID' },
-  { id: 'others',    label: 'OTHERS' },
+  { id: 'uhc',      label: 'UHC' },
+  { id: 'umr',      label: 'UMR' },
+  { id: 'cigna',    label: 'CIGNA' },
+  { id: 'availity', label: 'AVAILITY' },
+  { id: 'medicare', label: 'MEDICARE' },
+  { id: 'medicaid', label: 'MEDICAID' },
+  { id: 'others',   label: 'OTHERS' },
 ];
 
 const PORTAL_STATUSES = ['Not Started', 'In Progress', 'Complete', 'Roadblock'];
@@ -400,61 +428,184 @@ const PORTAL_STATUS_COLORS = {
   'Roadblock':   { bg: '#fee2e2', text: '#b91c1c' },
 };
 
-const STATE_KEY = 'vaqya_project_state';
-let STATE = {};
+let STATE = { practices: {}, portals: {} };
 
 // ─────────────────────────────────────────────
-// STATE MANAGEMENT
+// AUTH
 // ─────────────────────────────────────────────
-function loadState() {
-  try {
-    const saved = localStorage.getItem(STATE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch(e) {}
-  return null;
+async function handleLogin() {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  const btn      = document.getElementById('loginBtn');
+
+  if (!email || !password) {
+    errEl.textContent = 'Please enter your email and password.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+  errEl.classList.add('hidden');
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.remove('hidden');
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+  } else {
+    await bootDashboard();
+  }
 }
 
-function saveState() {
-  STATE.lastSaved = new Date().toISOString();
-  localStorage.setItem(STATE_KEY, JSON.stringify(STATE));
-  const ts = new Date(STATE.lastSaved);
-  document.getElementById('lastSaved').textContent =
-    ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
-    ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+async function handleLogout() {
+  await sb.auth.signOut();
+  document.getElementById('dashboardWrapper').classList.add('hidden');
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginBtn').textContent = 'Sign In';
+  document.getElementById('loginBtn').disabled = false;
 }
 
-function initState() {
-  const saved = loadState();
-  STATE = saved || { lastSaved: null, practices: {}, portals: {} };
-  if (!STATE.practices) STATE.practices = {};
-  if (!STATE.portals)   STATE.portals   = {};
-
-  // Ensure every practice/component key exists
+// ─────────────────────────────────────────────
+// STATE — LOAD FROM SUPABASE
+// ─────────────────────────────────────────────
+function initEmptyState() {
   PHASES.forEach(phase => {
     phase.practices.forEach(p => {
-      if (!STATE.practices[p.id]) STATE.practices[p.id] = {};
-      COMPONENTS.forEach(c => {
-        if (!STATE.practices[p.id][c.id]) {
-          STATE.practices[p.id][c.id] = 'Not Started';
-        }
-      });
-
-      // Ensure every practice/portal key exists
-      if (!STATE.portals[p.id]) STATE.portals[p.id] = {};
-      PORTALS.forEach(portal => {
-        if (!STATE.portals[p.id][portal.id]) {
-          STATE.portals[p.id][portal.id] = 'Not Started';
-        }
-      });
+      STATE.practices[p.id] = {};
+      COMPONENTS.forEach(c => { STATE.practices[p.id][c.id] = 'Not Started'; });
+      STATE.portals[p.id] = {};
+      PORTALS.forEach(portal => { STATE.portals[p.id][portal.id] = 'Not Started'; });
     });
   });
+}
 
-  if (STATE.lastSaved) {
-    const ts = new Date(STATE.lastSaved);
-    document.getElementById('lastSaved').textContent =
-      ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
-      ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+async function loadFromSupabase() {
+  initEmptyState();
+
+  const [{ data: practiceData }, { data: portalData }] = await Promise.all([
+    sb.from('practice_statuses').select('practice_id, component_id, status, updated_at'),
+    sb.from('portal_statuses').select('practice_id, portal_id, status, updated_at'),
+  ]);
+
+  if (practiceData) {
+    practiceData.forEach(row => {
+      if (STATE.practices[row.practice_id]) {
+        STATE.practices[row.practice_id][row.component_id] = row.status;
+      }
+    });
   }
+
+  if (portalData) {
+    portalData.forEach(row => {
+      if (STATE.portals[row.practice_id]) {
+        STATE.portals[row.practice_id][row.portal_id] = row.status;
+      }
+    });
+  }
+
+  // Show timestamp of most recent change
+  const allDates = [
+    ...(practiceData || []).map(r => r.updated_at),
+    ...(portalData   || []).map(r => r.updated_at),
+  ].filter(Boolean).sort();
+  if (allDates.length) updateLastSaved(new Date(allDates[allDates.length - 1]));
+}
+
+function updateLastSaved(date) {
+  const d = date || new Date();
+  document.getElementById('lastSaved').textContent =
+    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+    d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// ─────────────────────────────────────────────
+// STATE — SAVE TO SUPABASE
+// ─────────────────────────────────────────────
+async function updateState(selectEl) {
+  const practiceId  = selectEl.dataset.practice;
+  const componentId = selectEl.dataset.component;
+  const newStatus   = selectEl.value;
+
+  STATE.practices[practiceId][componentId] = newStatus;
+  applyStatusColor(selectEl);
+  refreshPracticeCard(practiceId);
+  const phaseId = getPracticePhase(practiceId);
+  refreshPhaseProgress(phaseId);
+  refreshOverall();
+  renderWeeklyFocus();
+
+  const { error } = await sb.from('practice_statuses').upsert({
+    practice_id:  practiceId,
+    component_id: componentId,
+    status:       newStatus,
+    updated_at:   new Date().toISOString(),
+  }, { onConflict: 'practice_id,component_id' });
+
+  if (error) { console.error('Save failed:', error.message); }
+  else { updateLastSaved(); }
+}
+
+async function updatePortalState(selectEl) {
+  const practiceId = selectEl.dataset.practice;
+  const portalId   = selectEl.dataset.portal;
+  const newStatus  = selectEl.value;
+
+  STATE.portals[practiceId][portalId] = newStatus;
+  applyPortalColor(selectEl);
+  refreshPortalCounts();
+
+  const { error } = await sb.from('portal_statuses').upsert({
+    practice_id: practiceId,
+    portal_id:   portalId,
+    status:      newStatus,
+    updated_at:  new Date().toISOString(),
+  }, { onConflict: 'practice_id,portal_id' });
+
+  if (error) { console.error('Save failed:', error.message); }
+  else { updateLastSaved(); }
+}
+
+// ─────────────────────────────────────────────
+// REAL-TIME SUBSCRIPTIONS
+// ─────────────────────────────────────────────
+function subscribeToChanges() {
+  sb.channel('dashboard_realtime')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'practice_statuses' },
+      (payload) => {
+        if (!payload.new) return;
+        const { practice_id, component_id, status, updated_at } = payload.new;
+        if (!STATE.practices[practice_id]) return;
+        STATE.practices[practice_id][component_id] = status;
+        const sel = document.querySelector(`select[data-practice="${practice_id}"][data-component="${component_id}"]`);
+        if (sel) { sel.value = status; applyStatusColor(sel); }
+        refreshPracticeCard(practice_id);
+        const phaseId = getPracticePhase(practice_id);
+        refreshPhaseProgress(phaseId);
+        refreshOverall();
+        renderWeeklyFocus();
+        if (updated_at) updateLastSaved(new Date(updated_at));
+      }
+    )
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'portal_statuses' },
+      (payload) => {
+        if (!payload.new) return;
+        const { practice_id, portal_id, status, updated_at } = payload.new;
+        if (!STATE.portals[practice_id]) return;
+        STATE.portals[practice_id][portal_id] = status;
+        const sel = document.querySelector(`select[data-practice="${practice_id}"][data-portal="${portal_id}"]`);
+        if (sel) { sel.value = status; applyPortalColor(sel); }
+        refreshPortalCounts();
+        if (updated_at) updateLastSaved(new Date(updated_at));
+      }
+    )
+    .subscribe();
 }
 
 // ─────────────────────────────────────────────
@@ -490,21 +641,14 @@ function calcOverall() {
 // ─────────────────────────────────────────────
 // DOM UPDATES
 // ─────────────────────────────────────────────
-function updateState(selectEl) {
-  const practiceId = selectEl.dataset.practice;
-  const componentId = selectEl.dataset.component;
-  STATE.practices[practiceId][componentId] = selectEl.value;
-  applyStatusColor(selectEl);
-  saveState();
-  refreshPracticeCard(practiceId);
-  const phaseId = getPracticePhase(practiceId);
-  refreshPhaseProgress(phaseId);
-  refreshOverall();
-  renderWeeklyFocus();
-}
-
 function applyStatusColor(sel) {
   const colors = STATUS_COLORS[sel.value] || STATUS_COLORS['Not Started'];
+  sel.style.backgroundColor = colors.bg;
+  sel.style.color = colors.text;
+}
+
+function applyPortalColor(sel) {
+  const colors = PORTAL_STATUS_COLORS[sel.value] || PORTAL_STATUS_COLORS['Not Started'];
   sel.style.backgroundColor = colors.bg;
   sel.style.color = colors.text;
 }
@@ -529,13 +673,17 @@ function refreshPracticeCard(practiceId) {
 }
 
 function refreshPhaseProgress(phaseId) {
-  const pct = calcPhaseCompletion(phaseId);
-  const bar = document.getElementById(phaseId + '-bar');
-  const label = document.getElementById(phaseId + '-pct-label');
+  const pct    = calcPhaseCompletion(phaseId);
+  const bar    = document.getElementById(phaseId + '-bar');
+  const label  = document.getElementById(phaseId + '-pct-label');
   const tabPct = document.getElementById('tab-pct-' + phaseId);
-  if (bar) bar.style.width = pct + '%';
-  if (label) label.textContent = pct + '%';
+  if (bar)    bar.style.width = pct + '%';
+  if (label)  label.textContent = pct + '%';
   if (tabPct) tabPct.textContent = pct + '%';
+}
+
+function refreshAllPhases() {
+  PHASES.forEach(phase => refreshPhaseProgress(phase.id));
 }
 
 function refreshOverall() {
@@ -543,8 +691,23 @@ function refreshOverall() {
   const pct = Math.round((done / total) * 100);
   document.getElementById('overallBar').style.width = pct + '%';
   document.getElementById('overallPct').textContent = pct + '%';
-  document.getElementById('completedCount').innerHTML = `✅ <b>${done}</b> Complete`;
+  document.getElementById('completedCount').innerHTML  = `✅ <b>${done}</b> Complete`;
   document.getElementById('inProgressCount').innerHTML = `🔄 <b>${inProg}</b> In Progress`;
+}
+
+function refreshPortalCounts() {
+  let complete = 0, roadblock = 0;
+  PHASES.forEach(phase => {
+    phase.practices.forEach(p => {
+      PORTALS.forEach(portal => {
+        const s = STATE.portals[p.id]?.[portal.id] || 'Not Started';
+        if (s === 'Complete')  complete++;
+        if (s === 'Roadblock') roadblock++;
+      });
+    });
+  });
+  document.getElementById('portal-complete-count').textContent  = `✅ ${complete} Complete`;
+  document.getElementById('portal-roadblock-count').textContent = `🚧 ${roadblock} Roadblock${roadblock !== 1 ? 's' : ''}`;
 }
 
 // ─────────────────────────────────────────────
@@ -553,27 +716,21 @@ function refreshOverall() {
 function renderWeeklyFocus() {
   const grid = document.getElementById('weeklyFocusGrid');
   grid.innerHTML = '';
-
   PHASES.forEach(phase => {
-    const phaseColors = {
+    const colors = {
       phase1: { border: 'border-orange-300', header: 'text-orange-700 bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
-      phase2: { border: 'border-blue-300',   header: 'text-blue-700 bg-blue-50',   badge: 'bg-blue-100 text-blue-700' },
+      phase2: { border: 'border-blue-300',   header: 'text-blue-700 bg-blue-50',     badge: 'bg-blue-100 text-blue-700' },
       phase3: { border: 'border-purple-300', header: 'text-purple-700 bg-purple-50', badge: 'bg-purple-100 text-purple-700' },
-      phase4: { border: 'border-gray-300',   header: 'text-gray-600 bg-gray-50',   badge: 'bg-gray-100 text-gray-600' },
-    };
-    const c = phaseColors[phase.id];
-
-    // Sort by priority, then filter incomplete (0–99%)
-    const sorted = [...phase.practices].sort((a, b) => a.priority - b.priority);
-    const incomplete = sorted.filter(p => calcPracticeCompletion(p.id) < 100);
-    const top = incomplete.slice(0, 3);
-
+      phase4: { border: 'border-gray-300',   header: 'text-gray-600 bg-gray-50',     badge: 'bg-gray-100 text-gray-600' },
+    }[phase.id];
+    const top = [...phase.practices].sort((a, b) => a.priority - b.priority)
+      .filter(p => calcPracticeCompletion(p.id) < 100).slice(0, 3);
     const col = document.createElement('div');
-    col.className = `border ${c.border} rounded-lg overflow-hidden`;
+    col.className = `border ${colors.border} rounded-lg overflow-hidden`;
     col.innerHTML = `
-      <div class="px-3 py-2 ${c.header} font-bold text-xs uppercase tracking-wide flex justify-between items-center">
+      <div class="px-3 py-2 ${colors.header} font-bold text-xs uppercase tracking-wide flex justify-between items-center">
         <span>${phase.label} · ${phase.deadline}</span>
-        <span class="${c.badge} text-xs px-2 py-0.5 rounded-full">${calcPhaseCompletion(phase.id)}%</span>
+        <span class="${colors.badge} text-xs px-2 py-0.5 rounded-full">${calcPhaseCompletion(phase.id)}%</span>
       </div>
       <div class="bg-white divide-y divide-gray-100">
         ${top.length === 0
@@ -581,8 +738,7 @@ function renderWeeklyFocus() {
           : top.map(p => {
               const pct = calcPracticeCompletion(p.id);
               const nextComp = COMPONENTS.find(c => STATE.practices[p.id]?.[c.id] !== 'Complete');
-              return `
-              <div class="px-3 py-2">
+              return `<div class="px-3 py-2">
                 <div class="flex justify-between items-start">
                   <div class="font-semibold text-xs text-gray-800 leading-tight">${p.name}</div>
                   <span class="text-xs ${pct > 0 ? 'text-blue-600' : 'text-gray-400'} font-bold ml-2 shrink-0">${pct}%</span>
@@ -591,8 +747,7 @@ function renderWeeklyFocus() {
               </div>`;
             }).join('')
         }
-      </div>
-    `;
+      </div>`;
     grid.appendChild(col);
   });
 }
@@ -600,83 +755,60 @@ function renderWeeklyFocus() {
 // ─────────────────────────────────────────────
 // CARD RENDERING
 // ─────────────────────────────────────────────
-function renderCard(practice, phaseId) {
+function renderCard(practice) {
   const pct = calcPracticeCompletion(practice.id);
-
-  const stateColors = {
-    'Arizona': 'bg-red-50 text-red-700',
+  const stateClass = ({
+    'Arizona':  'bg-red-50 text-red-700',
     'Florida':  'bg-sky-50 text-sky-700',
     'Georgia':  'bg-emerald-50 text-emerald-700',
     'Texas':    'bg-orange-50 text-orange-700',
     'Illinois': 'bg-indigo-50 text-indigo-700',
     'Missouri': 'bg-violet-50 text-violet-700',
     'Kentucky': 'bg-pink-50 text-pink-700',
-  };
-  const stateClass = stateColors[practice.state] || 'bg-gray-100 text-gray-600';
+  })[practice.state] || 'bg-gray-100 text-gray-600';
 
   const priorityClass = practice.priority === 1 ? 'bg-red-500 text-white' :
                         practice.priority === 2 ? 'bg-orange-400 text-white' :
                         practice.priority === 3 ? 'bg-yellow-400 text-gray-800' :
-                        'bg-gray-200 text-gray-600';
+                                                  'bg-gray-200 text-gray-600';
 
   const rows = COMPONENTS.map(comp => {
-    const status = STATE.practices[practice.id]?.[comp.id] || 'Not Started';
-    const colors = STATUS_COLORS[status];
-    const options = STATUSES.map(s =>
-      `<option value="${s}" ${s === status ? 'selected' : ''}>${s}</option>`
-    ).join('');
-    return `
-      <tr class="border-t border-gray-100">
-        <td class="py-1.5 pr-3 text-xs text-gray-600 font-medium whitespace-nowrap w-44">${comp.label}</td>
-        <td class="py-1.5 w-full">
-          <select
-            class="status-select"
-            style="background-color:${colors.bg}; color:${colors.text};"
-            data-practice="${practice.id}"
-            data-component="${comp.id}"
-            onchange="updateState(this)"
-          >${options}</select>
-        </td>
-      </tr>`;
+    const status  = STATE.practices[practice.id]?.[comp.id] || 'Not Started';
+    const colors  = STATUS_COLORS[status];
+    const options = STATUSES.map(s => `<option value="${s}" ${s === status ? 'selected' : ''}>${s}</option>`).join('');
+    return `<tr class="border-t border-gray-100">
+      <td class="py-1.5 pr-3 text-xs text-gray-600 font-medium whitespace-nowrap w-44">${comp.label}</td>
+      <td class="py-1.5 w-full">
+        <select class="status-select" style="background-color:${colors.bg}; color:${colors.text};"
+          data-practice="${practice.id}" data-component="${comp.id}" onchange="updateState(this)">${options}</select>
+      </td>
+    </tr>`;
   }).join('');
 
-  const completionClass = pct === 100 ? 'bg-green-100 text-green-700' :
-                          pct > 0     ? 'bg-blue-100 text-blue-700' :
-                                        'bg-gray-100 text-gray-500';
+  const badgeClass = pct === 100 ? 'bg-green-100 text-green-700' :
+                     pct > 0     ? 'bg-blue-100 text-blue-700' :
+                                   'bg-gray-100 text-gray-500';
 
-  return `
-    <div class="practice-card bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-start justify-between gap-2">
-        <div>
-          <div class="font-bold text-gray-900 text-sm leading-tight">${practice.name}</div>
-          <div class="flex gap-2 mt-1.5 flex-wrap">
-            <span class="text-xs px-2 py-0.5 rounded-full font-medium ${stateClass}">${practice.state}</span>
-            <span class="text-xs px-2 py-0.5 rounded-full font-bold ${priorityClass}">P${practice.priority}</span>
-          </div>
+  return `<div class="practice-card bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-start justify-between gap-2">
+      <div>
+        <div class="font-bold text-gray-900 text-sm leading-tight">${practice.name}</div>
+        <div class="flex gap-2 mt-1.5 flex-wrap">
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium ${stateClass}">${practice.state}</span>
+          <span class="text-xs px-2 py-0.5 rounded-full font-bold ${priorityClass}">P${practice.priority}</span>
         </div>
-        <span id="badge-${practice.id}" class="completion-badge ${completionClass} shrink-0">${pct}%</span>
       </div>
-      <div class="px-4 py-3">
-        <table class="w-full">
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>`;
+      <span id="badge-${practice.id}" class="completion-badge ${badgeClass} shrink-0">${pct}%</span>
+    </div>
+    <div class="px-4 py-3"><table class="w-full"><tbody>${rows}</tbody></table></div>
+  </div>`;
 }
 
-// ─────────────────────────────────────────────
-// PHASE RENDERING
-// ─────────────────────────────────────────────
 function renderAllCards() {
   PHASES.forEach(phase => {
     const container = document.getElementById('cards-' + phase.id);
-    if (!container) return;
-    container.innerHTML = phase.practices.map(p => renderCard(p, phase.id)).join('');
+    if (container) container.innerHTML = phase.practices.map(p => renderCard(p)).join('');
   });
-}
-
-function refreshAllPhases() {
-  PHASES.forEach(phase => refreshPhaseProgress(phase.id));
 }
 
 // ─────────────────────────────────────────────
@@ -696,88 +828,40 @@ let portalSectionOpen = true;
 
 function togglePortalSection() {
   portalSectionOpen = !portalSectionOpen;
-  const wrapper = document.getElementById('portalTableWrapper');
-  const chevron = document.getElementById('portal-chevron');
-  wrapper.style.display = portalSectionOpen ? '' : 'none';
-  chevron.style.transform = portalSectionOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
-}
-
-function updatePortalState(selectEl) {
-  const practiceId = selectEl.dataset.practice;
-  const portalId   = selectEl.dataset.portal;
-  STATE.portals[practiceId][portalId] = selectEl.value;
-  applyPortalColor(selectEl);
-  saveState();
-  refreshPortalCounts();
-}
-
-function applyPortalColor(sel) {
-  const colors = PORTAL_STATUS_COLORS[sel.value] || PORTAL_STATUS_COLORS['Not Started'];
-  sel.style.backgroundColor = colors.bg;
-  sel.style.color = colors.text;
-}
-
-function refreshPortalCounts() {
-  let complete = 0, roadblock = 0;
-  PHASES.forEach(phase => {
-    phase.practices.forEach(p => {
-      PORTALS.forEach(portal => {
-        const s = STATE.portals[p.id]?.[portal.id] || 'Not Started';
-        if (s === 'Complete')  complete++;
-        if (s === 'Roadblock') roadblock++;
-      });
-    });
-  });
-  document.getElementById('portal-complete-count').textContent   = `✅ ${complete} Complete`;
-  document.getElementById('portal-roadblock-count').textContent  = `🚧 ${roadblock} Roadblock${roadblock !== 1 ? 's' : ''}`;
+  document.getElementById('portalTableWrapper').style.display = portalSectionOpen ? '' : 'none';
+  document.getElementById('portal-chevron').style.transform   = portalSectionOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
 }
 
 function renderPortalTable() {
   const tbody = document.getElementById('portalTableBody');
   if (!tbody) return;
-
   const phaseLabels = { phase1: 'P1', phase2: 'P2', phase3: 'P3', phase4: 'P4' };
-  const phaseRowColors = {
-    phase1: 'bg-orange-50', phase2: 'bg-blue-50',
-    phase3: 'bg-purple-50', phase4: 'bg-gray-50'
-  };
-
+  const phaseRowColors = { phase1: 'bg-orange-50', phase2: 'bg-blue-50', phase3: 'bg-purple-50', phase4: 'bg-gray-50' };
   let html = '';
   PHASES.forEach(phase => {
     phase.practices.forEach((p, idx) => {
       const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
       const portalCells = PORTALS.map(portal => {
-        const status = STATE.portals[p.id]?.[portal.id] || 'Not Started';
-        const colors = PORTAL_STATUS_COLORS[status];
-        const options = PORTAL_STATUSES.map(s =>
-          `<option value="${s}" ${s === status ? 'selected' : ''}>${s}</option>`
-        ).join('');
-        return `
-          <td class="px-1.5 py-1 text-center">
-            <select
-              class="portal-select"
-              style="background-color:${colors.bg}; color:${colors.text};"
-              data-practice="${p.id}"
-              data-portal="${portal.id}"
-              onchange="updatePortalState(this)"
-            >${options}</select>
-          </td>`;
+        const status  = STATE.portals[p.id]?.[portal.id] || 'Not Started';
+        const colors  = PORTAL_STATUS_COLORS[status];
+        const options = PORTAL_STATUSES.map(s => `<option value="${s}" ${s === status ? 'selected' : ''}>${s}</option>`).join('');
+        return `<td class="px-1.5 py-1 text-center">
+          <select class="portal-select" style="background-color:${colors.bg}; color:${colors.text};"
+            data-practice="${p.id}" data-portal="${portal.id}" onchange="updatePortalState(this)">${options}</select>
+        </td>`;
       }).join('');
-
-      html += `
-        <tr class="${rowBg} border-b border-gray-100 hover:bg-indigo-50/30 transition-colors">
-          <td class="px-3 py-2 sticky left-0 ${rowBg} border-r border-gray-200 z-10">
-            <div class="font-semibold text-gray-800 leading-tight">${p.name}</div>
-            <div class="text-gray-400 text-[10px]">${p.state} · Priority ${p.priority}</div>
-          </td>
-          <td class="px-2 py-2 text-center">
-            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${phaseRowColors[phase.id]} text-gray-600">${phaseLabels[phase.id]}</span>
-          </td>
-          ${portalCells}
-        </tr>`;
+      html += `<tr class="${rowBg} border-b border-gray-100 hover:bg-indigo-50/30 transition-colors">
+        <td class="px-3 py-2 sticky left-0 ${rowBg} border-r border-gray-200 z-10">
+          <div class="font-semibold text-gray-800 leading-tight">${p.name}</div>
+          <div class="text-gray-400 text-[10px]">${p.state} · Priority ${p.priority}</div>
+        </td>
+        <td class="px-2 py-2 text-center">
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${phaseRowColors[phase.id]} text-gray-600">${phaseLabels[phase.id]}</span>
+        </td>
+        ${portalCells}
+      </tr>`;
     });
   });
-
   tbody.innerHTML = html;
   refreshPortalCounts();
 }
@@ -786,36 +870,33 @@ function renderPortalTable() {
 // EXPORT STATE
 // ─────────────────────────────────────────────
 function exportState() {
-  const snapshot = JSON.parse(JSON.stringify(STATE));
-  snapshot.exportedAt = new Date().toISOString();
-  snapshot.meta = {
-    totalPractices: 16,
-    totalComponents: 96,
-    phases: PHASES.map(phase => ({
-      id: phase.id,
-      label: phase.label,
-      deadline: phase.deadline,
-      completionPct: calcPhaseCompletion(phase.id),
-      practices: phase.practices.map(p => ({
-        id: p.id,
-        name: p.name,
-        state: p.state,
-        priority: p.priority,
-        completionPct: calcPracticeCompletion(p.id),
-        components: COMPONENTS.reduce((acc, c) => {
-          acc[c.id] = STATE.practices[p.id]?.[c.id] || 'Not Started';
-          return acc;
-        }, {})
-      }))
-    }))
+  const snapshot = {
+    exportedAt: new Date().toISOString(),
+    practices:  STATE.practices,
+    portals:    STATE.portals,
+    meta: {
+      totalPractices:  16,
+      totalComponents: 96,
+      phases: PHASES.map(phase => ({
+        id: phase.id, label: phase.label, deadline: phase.deadline,
+        completionPct: calcPhaseCompletion(phase.id),
+        practices: phase.practices.map(p => ({
+          id: p.id, name: p.name, state: p.state, priority: p.priority,
+          completionPct: calcPracticeCompletion(p.id),
+          components: COMPONENTS.reduce((acc, c) => {
+            acc[c.id] = STATE.practices[p.id]?.[c.id] || 'Not Started';
+            return acc;
+          }, {}),
+        })),
+      })),
+    },
   };
   const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
   a.download = 'project_state.json';
   a.click();
-  URL.revokeObjectURL(url);
+  URL.revokeObjectURL(a.href);
 }
 
 // ─────────────────────────────────────────────
@@ -835,129 +916,42 @@ Read the file at:
 
 Parse the JSON. If the file does not exist, note it and proceed with all components as "Not Started".
 
-The 6 automation components tracked per practice are:
-- claim-scrubbing (Claim Scrubbing)
-- eligibility-verification (Eligibility Verification)
-- denial-management (Denial Management)
-- prior-authorization (Prior Authorization)
-- claims-submission (Claims Submission)
-- posting (Posting)
-
 The 16 practices organized by phase:
 
-PHASE 1 (Target: June 2026) — sorted by priority:
-1. Arthritis Consultants PC (Arizona)
-2. Premier Health and Wellness (Arizona)
-3. Arizona Heart Specialists AZ (Arizona)
-4. Greatcare and Wellness (Arizona)
-5. Harshdeep Babbar (Arizona)
-6. Jatinder Purewal (Arizona)
-
-PHASE 2 (Target: August 2026) — sorted by priority:
-1. Markus Klaus (Florida)
-2. Swati Shah (Florida)
-3. Eastside Rheumatology (Georgia)
-4. Brookshire Rheumatology (Florida)
-5. Healing Rheumatology (Florida)
-6. First Choice Rheumatology (Texas)
-7. Ravenswood Rheumatology (Illinois)
-
-PHASE 3 (Target: October 2026):
-1. West County Rheumatology (Missouri)
-
-PHASE 4 (Target: TBD):
-1. Miispine (Kentucky)
-2. Sunrise Medical (Arizona)
+PHASE 1 (Target: June 2026): Arthritis Consultants PC, Premier Health and Wellness, Arizona Heart Specialists AZ, Greatcare and Wellness, Harshdeep Babbar, Jatinder Purewal
+PHASE 2 (Target: August 2026): Markus Klaus, Swati Shah, Eastside Rheumatology, Brookshire Rheumatology, Healing Rheumatology, First Choice Rheumatology, Ravenswood Rheumatology
+PHASE 3 (Target: October 2026): West County Rheumatology
+PHASE 4 (Target: TBD): Miispine, Sunrise Medical
 
 ## Step 2 — Calculate Progress
 
-For each practice, count how many of the 6 components are "Complete". Practice completion % = (complete count / 6) x 100.
-Phase completion % = average of all practice % in that phase.
-Overall completion % = total Complete components / 96 x 100.
+For each practice, count how many of the 6 components are "Complete". Phase completion % = average of all practices in that phase. Overall = total Complete / 96.
 
-## Step 3 — Generate the Weekly Report
+## Step 3 — Create Gmail Draft
 
-Format the report as plain text:
-
----
-VAQYA AUTOMATION — WEEKLY PROGRESS REPORT
-Week of: [current date]
-Generated: [current datetime]
----
-
-OVERALL SUMMARY
-Total Practices: 16 | Total Components: 96
-Overall Completion: X% ([N] of 96 components Complete)
-In Progress / Testing: [count]
-Not Started: [count]
-
----
-PHASE 1 — June 2026 Target — X% complete
-[For each practice in priority order:]
-  [Priority#] [Practice Name] ([State]) — X%
-    Complete: [list components or "none"]
-    In Progress/Testing: [list or "none"]
-    Not Started: [list or "none"]
-
----
-PHASE 2 — August 2026 Target — X% complete
-[same format]
-
----
-PHASE 3 — October 2026 Target — X% complete
-[same format]
-
----
-PHASE 4 — TBD — X% complete
-[same format]
-
----
-WEEKLY FOCUS — TOP PRIORITIES
-Phase 1: [top 2 in-progress or not-started practices by priority]
-Phase 2: [top 2 in-progress or not-started practices by priority]
-
----
-BLOCKERS / NOTES
-[Leave blank — to be filled before sending]
-
----
-Dashboard: C:\\Users\\shanm\\OneDrive\\Desktop\\Vaqya\\vaqya automation\\index.html
-
-## Step 4 — Create Gmail Draft
-
-Use the gmail_create_draft tool to create a draft with:
+Use gmail_create_draft with:
 - To: drmukundan@vaqya.com
 - Subject: Vaqya Automation Weekly Report — Week of [DATE]
-- Body: the full formatted report from Step 3
+- Body: formatted report showing overall %, each phase %, and weekly focus priorities
 
-## Step 5 — Post to Google Chat "Management Team"
+## Step 4 — Post to Google Chat
 
 WEBHOOK_URL="{{WEBHOOK_URL}}"
+curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -d "{\\"text\\": \\"*Vaqya Automation — Weekly Update*\\\\nOverall: X%\\\\nPhase 1: X% | Phase 2: X% | Phase 3: X% | Phase 4: X%\\"}"
 
-Run this bash command:
-curl -s -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -d "{\\"text\\": \\"*Vaqya Automation — Weekly Update*\\\\nWeek of: [DATE]\\\\n\\\\nOverall: X% ([N]/96)\\\\nPhase 1 (Jun 2026): X%\\\\nPhase 2 (Aug 2026): X%\\\\nPhase 3 (Oct 2026): X%\\\\nPhase 4 (TBD): X%\\\\n\\\\nThis week focus:\\\\n- [top priority 1]\\\\n- [top priority 2]\\\\n\\\\nFull report drafted in Gmail.\\"}"
-
-## Step 6 — Confirm
+## Step 5 — Confirm
 
 Output: "Weekly report complete — [date]. Gmail draft created. Google Chat posted."
 `;
 
 function openSetup() {
-  const modal = document.getElementById('setupModal');
-  modal.classList.remove('hidden');
-  // Pre-fill if webhook already saved
+  document.getElementById('setupModal').classList.remove('hidden');
   const saved = localStorage.getItem('vaqya_webhook_url');
-  if (saved) {
-    document.getElementById('webhookUrlInput').value = saved;
-    showWebhookStatus(true, saved);
-  }
+  if (saved) { document.getElementById('webhookUrlInput').value = saved; showWebhookStatus(true); }
 }
+function closeSetup() { document.getElementById('setupModal').classList.add('hidden'); }
 
-function closeSetup() {
-  document.getElementById('setupModal').classList.add('hidden');
-}
-
-function showWebhookStatus(isSet, url) {
+function showWebhookStatus(isSet) {
   const banner = document.getElementById('webhookStatusBanner');
   banner.classList.remove('hidden');
   if (isSet) {
@@ -971,9 +965,7 @@ function showWebhookStatus(isSet, url) {
 
 function downloadSkillMd() {
   const url = document.getElementById('webhookUrlInput').value.trim();
-  const status = document.getElementById('downloadStatus');
   const validation = document.getElementById('webhookValidation');
-
   if (!url) {
     validation.textContent = '⚠️ Please paste your webhook URL first.';
     validation.className = 'text-xs mt-1 text-amber-600';
@@ -981,59 +973,58 @@ function downloadSkillMd() {
     return;
   }
   if (!url.startsWith('https://chat.googleapis.com')) {
-    validation.textContent = '⚠️ This doesn\'t look like a Google Chat webhook URL. Check and try again.';
+    validation.textContent = "⚠️ This doesn't look like a Google Chat webhook URL.";
     validation.className = 'text-xs mt-1 text-red-600';
     validation.classList.remove('hidden');
     return;
   }
-
   validation.classList.add('hidden');
   localStorage.setItem('vaqya_webhook_url', url);
-
-  const content = SKILL_MD_TEMPLATE.replace('{{WEBHOOK_URL}}', url);
-  const blob = new Blob([content], { type: 'text/markdown' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'SKILL.md';
-  a.click();
-  URL.revokeObjectURL(a.href);
-
-  status.textContent = '✅ Downloaded! Save this file to: C:\\Users\\shanm\\.claude\\scheduled-tasks\\vaqya-weekly-progress-report\\  (replace the existing SKILL.md)';
+  const blob = new Blob([SKILL_MD_TEMPLATE.replace('{{WEBHOOK_URL}}', url)], { type: 'text/markdown' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKILL.md'; a.click(); URL.revokeObjectURL(a.href);
+  const status = document.getElementById('downloadStatus');
+  status.textContent = '✅ Downloaded! Save to: C:\\Users\\shanm\\.claude\\scheduled-tasks\\vaqya-weekly-progress-report\\';
   status.className = 'text-xs mt-2 text-green-600 font-medium';
   status.classList.remove('hidden');
-  showWebhookStatus(true, url);
+  showWebhookStatus(true);
 }
 
 function copyPath() {
-  const path = 'C:\\Users\\shanm\\.claude\\scheduled-tasks\\vaqya-weekly-progress-report\\';
-  navigator.clipboard.writeText(path).then(() => {
-    const btn = event.target;
-    const orig = btn.textContent;
+  navigator.clipboard.writeText('C:\\Users\\shanm\\.claude\\scheduled-tasks\\vaqya-weekly-progress-report\\').then(() => {
+    const btn = event.target, orig = btn.textContent;
     btn.textContent = '✅ Copied!';
     setTimeout(() => btn.textContent = orig, 2000);
   });
 }
 
-// Close modal on backdrop click
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('setupModal').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('setupModal')) closeSetup();
-  });
-});
-
 // ─────────────────────────────────────────────
-// INIT
+// BOOT SEQUENCE
 // ─────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+async function bootDashboard() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('dashboardWrapper').classList.remove('hidden');
   document.getElementById('currentDate').textContent =
     new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-  initState();
+  document.getElementById('lastSaved').textContent = 'Loading…';
+  await loadFromSupabase();
   renderAllCards();
   refreshAllPhases();
   refreshOverall();
   renderWeeklyFocus();
   renderPortalTable();
+  subscribeToChanges();
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('setupModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('setupModal')) closeSetup();
+  });
+  // Resume existing session if user is already logged in
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await bootDashboard();
 });
 </script>
 </body>
