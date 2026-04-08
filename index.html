@@ -35,12 +35,7 @@
     </div>
     <div class="px-6 py-6 space-y-4">
       <div>
-        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Email</label>
-        <input id="loginEmail" type="email" placeholder="team@vaqya.com" autocomplete="email"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-400 focus:border-transparent transition" />
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Password</label>
+        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Team Password</label>
         <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password"
           class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-400 focus:border-transparent transition"
           onkeydown="if(event.key==='Enter') handleLogin()" />
@@ -342,10 +337,10 @@
 <script>
 // ─────────────────────────────────────────────
 // SUPABASE CONFIG
-// Fill in SUPABASE_ANON_KEY from: Supabase → Settings → API → anon/public key
 // ─────────────────────────────────────────────
 const SUPABASE_URL      = 'https://jznezqmqnyahemnwxgki.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6bmV6cW1xbnlhaGVtbnd4Z2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5ODU1MzIsImV4cCI6MjA5MDU2MTUzMn0.Wtgb6-_LF5atqNvHmpfTFQO4OGD0GrH4yPMKUxT9JaY';
+const TEAM_PASSWORD     = 'Vaqyateam26!';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -431,38 +426,33 @@ const PORTAL_STATUS_COLORS = {
 let STATE = { practices: {}, portals: {} };
 
 // ─────────────────────────────────────────────
-// AUTH
+// AUTH (simple password gate)
 // ─────────────────────────────────────────────
 async function handleLogin() {
-  const email    = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   const errEl    = document.getElementById('loginError');
   const btn      = document.getElementById('loginBtn');
 
-  if (!email || !password) {
-    errEl.textContent = 'Please enter your email and password.';
+  if (!password) {
+    errEl.textContent = 'Please enter the password.';
     errEl.classList.remove('hidden');
     return;
   }
 
-  btn.textContent = 'Signing in…';
-  btn.disabled = true;
-  errEl.classList.add('hidden');
-
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-
-  if (error) {
-    errEl.textContent = error.message;
+  if (password !== TEAM_PASSWORD) {
+    errEl.textContent = 'Incorrect password. Please try again.';
     errEl.classList.remove('hidden');
-    btn.textContent = 'Sign In';
-    btn.disabled = false;
-  } else {
-    await bootDashboard();
+    return;
   }
+
+  btn.textContent = 'Loading…';
+  btn.disabled = true;
+  sessionStorage.setItem('vaqya_auth', '1');
+  await bootDashboard();
 }
 
-async function handleLogout() {
-  await sb.auth.signOut();
+function handleLogout() {
+  sessionStorage.removeItem('vaqya_auth');
   document.getElementById('dashboardWrapper').classList.add('hidden');
   document.getElementById('loginOverlay').classList.remove('hidden');
   document.getElementById('loginPassword').value = '';
@@ -1022,9 +1012,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('setupModal').addEventListener('click', (e) => {
     if (e.target === document.getElementById('setupModal')) closeSetup();
   });
-  // Resume existing session if user is already logged in
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) await bootDashboard();
+  // Resume session if already logged in this browser tab
+  if (sessionStorage.getItem('vaqya_auth') === '1') await bootDashboard();
 });
 </script>
 </body>
