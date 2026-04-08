@@ -395,13 +395,14 @@ const COMPONENTS = [
   { id: 'posting',                  label: 'Posting' },
 ];
 
-const STATUSES = ['Not Started', 'In Progress', 'Testing', 'Complete'];
+const STATUSES = ['Not Started', 'In Progress', 'Testing', 'Complete', 'N/A'];
 
 const STATUS_COLORS = {
   'Not Started': { bg: '#f3f4f6', text: '#4b5563' },
   'In Progress': { bg: '#dbeafe', text: '#1d4ed8' },
   'Testing':     { bg: '#fef9c3', text: '#a16207' },
   'Complete':    { bg: '#dcfce7', text: '#15803d' },
+  'N/A':         { bg: '#f3f4f6', text: '#9ca3af' },
 };
 
 const PORTALS = [
@@ -414,13 +415,14 @@ const PORTALS = [
   { id: 'others',   label: 'OTHERS' },
 ];
 
-const PORTAL_STATUSES = ['Not Started', 'In Progress', 'Complete', 'Roadblock'];
+const PORTAL_STATUSES = ['Not Started', 'In Progress', 'Complete', 'Roadblock', 'N/A'];
 
 const PORTAL_STATUS_COLORS = {
   'Not Started': { bg: '#f3f4f6', text: '#4b5563' },
   'In Progress': { bg: '#dbeafe', text: '#1d4ed8' },
   'Complete':    { bg: '#dcfce7', text: '#15803d' },
   'Roadblock':   { bg: '#fee2e2', text: '#b91c1c' },
+  'N/A':         { bg: '#f3f4f6', text: '#9ca3af' },
 };
 
 let STATE = { practices: {}, portals: {} };
@@ -603,8 +605,10 @@ function subscribeToChanges() {
 // ─────────────────────────────────────────────
 function calcPracticeCompletion(practiceId) {
   const pState = STATE.practices[practiceId] || {};
-  const done = COMPONENTS.filter(c => pState[c.id] === 'Complete').length;
-  return Math.round((done / COMPONENTS.length) * 100);
+  const applicable = COMPONENTS.filter(c => pState[c.id] !== 'N/A');
+  if (!applicable.length) return 100;
+  const done = applicable.filter(c => pState[c.id] === 'Complete').length;
+  return Math.round((done / applicable.length) * 100);
 }
 
 function calcPhaseCompletion(phaseId) {
@@ -621,7 +625,7 @@ function calcOverall() {
       COMPONENTS.forEach(c => {
         const status = STATE.practices[p.id]?.[c.id] || 'Not Started';
         if (status === 'Complete') done++;
-        if (status === 'In Progress' || status === 'Testing') inProg++;
+        else if (status === 'In Progress' || status === 'Testing') inProg++;
       });
     });
   });
