@@ -619,17 +619,18 @@ function calcPhaseCompletion(phaseId) {
 }
 
 function calcOverall() {
-  let done = 0, inProg = 0;
+  let done = 0, inProg = 0, na = 0;
   PHASES.forEach(phase => {
     phase.practices.forEach(p => {
       COMPONENTS.forEach(c => {
         const status = STATE.practices[p.id]?.[c.id] || 'Not Started';
-        if (status === 'Complete') done++;
+        if (status === 'N/A') na++;
+        else if (status === 'Complete') done++;
         else if (status === 'In Progress' || status === 'Testing') inProg++;
       });
     });
   });
-  return { done, inProg, total: 96 };
+  return { done, inProg, total: 96 - na };
 }
 
 // ─────────────────────────────────────────────
@@ -682,7 +683,7 @@ function refreshAllPhases() {
 
 function refreshOverall() {
   const { done, inProg, total } = calcOverall();
-  const pct = Math.round((done / total) * 100);
+  const pct = total > 0 ? Math.round((done / total) * 100) : 100;
   document.getElementById('overallBar').style.width = pct + '%';
   document.getElementById('overallPct').textContent = pct + '%';
   document.getElementById('completedCount').innerHTML  = `✅ <b>${done}</b> Complete`;
