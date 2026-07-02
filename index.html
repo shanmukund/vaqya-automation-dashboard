@@ -158,7 +158,7 @@
       <span id="overallPct" class="font-bold text-teal-700">0%</span>
     </div>
     <div class="flex gap-4 text-xs text-gray-600 flex-wrap">
-      <span>📋 <b>16</b> Practices</span>
+      <span>📋 <b>15</b> Practices</span>
       <span>⚙️ <b>96</b> Components</span>
       <span id="completedCount">✅ <b>0</b> Complete</span>
       <span id="inProgressCount">🔄 <b>0</b> In Progress</span>
@@ -362,8 +362,7 @@ const PHASES = [
       { id: 'premier-health-wellness',    name: 'Premier Health and Wellness', state: 'Arizona',  priority: 2 },
       { id: 'arizona-heart-specialists',  name: 'Arizona Heart Specialists AZ',state: 'Arizona',  priority: 3 },
       { id: 'greatcare-wellness',         name: 'Greatcare and Wellness',      state: 'Arizona',  priority: 4 },
-      { id: 'harshdeep-babbar',           name: 'Harshdeep Babbar',            state: 'Arizona',  priority: 5 },
-      { id: 'jatinder-purewal',           name: 'Jatinder Purewal',            state: 'Arizona',  priority: 6 },
+      { id: 'jatinder-purewal',           name: 'Jatinder Purewal',            state: 'Arizona',  priority: 5 },
     ]
   },
   {
@@ -877,7 +876,7 @@ function exportState() {
     practices:  STATE.practices,
     portals:    STATE.portals,
     meta: {
-      totalPractices:  16,
+      totalPractices:  15,
       totalComponents: 96,
       phases: PHASES.map(phase => ({
         id: phase.id, label: phase.label, deadline: phase.deadline,
@@ -918,16 +917,16 @@ Read the file at:
 
 Parse the JSON. If the file does not exist, note it and proceed with all components as "Not Started".
 
-The 16 practices organized by phase:
+The 15 practices organized by phase:
 
-PHASE 1 (Target: June 2026): Arthritis Consultants PC, Premier Health and Wellness, Arizona Heart Specialists AZ, Greatcare and Wellness, Harshdeep Babbar, Jatinder Purewal
+PHASE 1 (Target: June 2026): Arthritis Consultants PC, Premier Health and Wellness, Arizona Heart Specialists AZ, Greatcare and Wellness, Jatinder Purewal
 PHASE 2 (Target: August 2026): Markus Klaus, Swati Shah, Eastside Rheumatology, Brookshire Rheumatology, Healing Rheumatology, First Choice Rheumatology, Ravenswood Rheumatology
 PHASE 3 (Target: October 2026): West County Rheumatology
 PHASE 4 (Target: TBD): Miispine, Sunrise Medical
 
 ## Step 2 — Calculate Progress
 
-For each practice, count how many of the 6 components are "Complete". Phase completion % = average of all practices in that phase. Overall = total Complete / 96.
+For each practice, count how many of the 6 components are "Complete". Phase completion % = average of all practices in that phase. Overall = total Complete / 90.
 
 ## Step 3 — Create Gmail Draft
 
