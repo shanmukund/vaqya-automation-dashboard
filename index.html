@@ -340,7 +340,14 @@
 // ─────────────────────────────────────────────
 const SUPABASE_URL      = 'https://jznezqmqnyahemnwxgki.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6bmV6cW1xbnlhaGVtbnd4Z2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5ODU1MzIsImV4cCI6MjA5MDU2MTUzMn0.Wtgb6-_LF5atqNvHmpfTFQO4OGD0GrH4yPMKUxT9JaY';
-const TEAM_PASSWORD     = 'Vaqyateam26!';
+// SHA-256 hash of the team password (raw password is not stored in source)
+const TEAM_PASSWORD_HASH = '494b7cb01c1d79ae7387a7fa877e395295916e64c88b2face8fb7c5b7020a28f';
+
+// Returns the lowercase hex SHA-256 of a string
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -441,7 +448,7 @@ async function handleLogin() {
     return;
   }
 
-  if (password !== TEAM_PASSWORD) {
+  if (await sha256Hex(password) !== TEAM_PASSWORD_HASH) {
     errEl.textContent = 'Incorrect password. Please try again.';
     errEl.classList.remove('hidden');
     return;
